@@ -15,7 +15,7 @@ STOCK_COL     = "Cobertura"
 
 today = date.today()
 
-conn = sqlite3.connect(r"C:\Users\GastonVecchio\Documents\Code\inventory.db")
+conn = sqlite3.connect(r"C:\Users\GastonVecchio\Documents\Code\Python\Stocks\inventory.db")
 cursor = conn.cursor()
 
 procedure = input("Que queres hacer?\n1-Actualizar stocks\n2-Alertar faltantes\n")
@@ -143,11 +143,23 @@ def alertar_faltantes():
     low_stock_ATLANTICO_df = ATLANTICO_STOCK[ATLANTICO_STOCK["Cobertura"] < 0.50]      
     low_stock_ATLANTICO_df = low_stock_ATLANTICO_df.dropna(subset=["Cobertura"])                                     
 
+    df_db = pd.read_sql("SELECT * FROM stockouts", conn)
+    new_crashes = low_stock_ATLANTICO_df[~low_stock_ATLANTICO_df[PRODUCT_COL].isin(df_db['product_name'])]
+    
+    for _, row in new_crashes.iterrows():
+        cursor.execute(
+            "INSERT INTO stockouts (product_name, date_of_stockout, notes, company) VALUES (?, ?, ?, ?)",
+            (row[PRODUCT_COL], str(today), row["Estado"], "Atlantico")
+        )
+
+    conn.commit()
+
     rows_html = ""
     for _, row in low_stock_ATLANTICO_df.iterrows():
         product = row[PRODUCT_COL]
         cobertura = f"{row[STOCK_COL] * 100:.2f}%"
         estado = "Pendiente" if pd.isna(row["Estado"]) else row["Estado"]
+        
         rows_html += f"""
             <tr>
                 <td style="padding: 8px; border: 1px solid #ddd;">{product}</td>
@@ -174,24 +186,7 @@ def alertar_faltantes():
 
     # Send email ATLATNICO
     send_email(html_body, "⚠️ Alerta productos con stock menor a 50% ATLANTICO")
-
-    def write_to_db():
-        cursor.execute("SELECT product_name, date_of_stockout FROM stockouts WHERE product_name=?",(product,))
-        rows = cursor.fetchall()
-
-
-        for product_name, date_of_stockout in rows:
-            stockout_date = date.fromisoformat(date_of_stockout)
-            days_ago = (today - stockout_date).days
-            print(f"{product_name} ran out of stock {days_ago} days ago")
-            if (days_ago < 1):
-                cursor.execute("""
-                    INSERT INTO stockouts (product_name, date_of_stockout, note)
-                    VALUES (?, ?, ?)
-                    """, (product, today, estado)          )
-        
-        conn.commit()
-
+    
 
 if (procedure == "1"):
     actualizar_stock()
