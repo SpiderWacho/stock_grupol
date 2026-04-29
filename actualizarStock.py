@@ -15,7 +15,7 @@ STOCK_COL     = "Cobertura"
 
 today = date.today()
 
-conn = sqlite3.connect(r"C:\Users\GastonVecchio\Documents\Code\Python\Stocks\inventory.db")
+conn = sqlite3.connect(r"C:\Users\GastonVecchio\Documents\Code\inventory.db")
 cursor = conn.cursor()
 
 
@@ -168,9 +168,45 @@ def alertar_faltantes():
                 <td style="padding: 8px; border: 1px solid #ddd; text-align:center;">{estado}</td>
             </tr>
         """
-        return rows
 
-    EMAIL_TEMPLATE = """
+    html_body = f"""
+    <p>Este es un mail automatico, comprar los siguientes productos con poco stock:</p>
+    <table style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif;">
+        <thead>
+            <tr style="background-color: #4472C4; color: white;">
+                <th style="padding: 10px; border: 1px solid #ddd;">Producto</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">Cobertura</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {rows_html}
+        </tbody>
+    </table>
+    """
+
+    send_email(html_body, "⚠️ Alerta productos con stock menor a 50% VO")
+
+    # Build email ATLANTICO
+    ATLANTICO_STOCK = pd.read_excel(r"C:\Users\GastonVecchio\Grupo L\Abastecimiento Online - Documentos (1)\10. Operador Descartables\COMPRAS DESCARTABLES MORENO Y CIUDADELA\Seguimiento stock descartables ATLANTICO.xlsx", "Necesidad por familia")
+    ATLANTICO_STOCK["Cobertura"] = pd.to_numeric(ATLANTICO_STOCK["Cobertura"], errors="coerce")
+    low_stock_ATLANTICO_df = ATLANTICO_STOCK[ATLANTICO_STOCK["Cobertura"] < 0.50]      
+    low_stock_ATLANTICO_df = low_stock_ATLANTICO_df.dropna(subset=["Cobertura"])                                     
+
+    rows_html = ""
+    for _, row in low_stock_ATLANTICO_df.iterrows():
+        product = row[PRODUCT_COL]
+        cobertura = f"{row[STOCK_COL] * 100:.2f}%"
+        estado = "Pendiente" if pd.isna(row["Estado"]) else row["Estado"]
+        rows_html += f"""
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;">{product}</td>
+                <td style="padding: 8px; border: 1px solid #ddd; text-align:center;">{cobertura}</td>
+                <td style="padding: 8px; border: 1px solid #ddd; text-align:center;">{estado}</td>
+            </tr>
+        """
+
+    html_body = f"""
         <p>Este es un mail automatico, comprar los siguientes productos con poco stock:</p>
         <table style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif;">
             <thead>
@@ -180,63 +216,15 @@ def alertar_faltantes():
                     <th style="padding: 10px; border: 1px solid #ddd;">Estado</th>
                 </tr>
             </thead>
-            <tbody>{rows}</tbody>
-        </table>"""
+            <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+        """
 
-    print("Leyendo stock y necesidades de deposito...")
-
-    VO_STOCK = pd.read_excel(r"C:\Users\GastonVecchio\Grupo L\Abastecimiento Online - Documentos (1)\10. Operador Descartables\COMPRAS DESCARTABLES MORENO Y CIUDADELA\Seguimiento stock descartables VO.xlsx", "Necesidad por familia", header=1)
-    VO_STOCK[STOCK_COL] = pd.to_numeric(VO_STOCK[STOCK_COL], errors="coerce")
-    low_stock_VO_df = VO_STOCK[VO_STOCK[STOCK_COL] < 0.50].dropna(subset=[STOCK_COL])
-    _sync_stockouts(low_stock_VO_df, "VO")
-    send_email(EMAIL_TEMPLATE.format(rows=build_rows_html(low_stock_VO_df)), "⚠️ Alerta productos con stock menor a 50% VO")
-
-    ATLANTICO_STOCK = pd.read_excel(r"C:\Users\GastonVecchio\Grupo L\Abastecimiento Online - Documentos (1)\10. Operador Descartables\COMPRAS DESCARTABLES MORENO Y CIUDADELA\Seguimiento stock descartables ATLANTICO.xlsx", "Necesidad por familia")
-    ATLANTICO_STOCK[STOCK_COL] = pd.to_numeric(ATLANTICO_STOCK[STOCK_COL], errors="coerce")
-    low_stock_ATLANTICO_df = ATLANTICO_STOCK[ATLANTICO_STOCK[STOCK_COL] < 0.50].dropna(subset=[STOCK_COL])
-    _sync_stockouts(low_stock_ATLANTICO_df, "Atlantico")
-    send_email(EMAIL_TEMPLATE.format(rows=build_rows_html(low_stock_ATLANTICO_df)), "⚠️ Alerta productos con stock menor a 50% ATLANTICO")
+    # Send email ATLATNICO
+    send_email(html_body, "⚠️ Alerta productos con stock menor a 50% ATLANTICO")
     
-
-def mostrar_kpis():
-    df_db = pd.read_sql("SELECT * FROM stockouts", conn)
-    if df_db.empty:
-        print("No hay datos de stockouts registrados.")
-        return
-
-    df_db["date_of_stockout"] = pd.to_datetime(df_db["date_of_stockout"])
-    df_db["date_resolved"] = pd.to_datetime(df_db["date_resolved"])
-    today_ts = pd.Timestamp(today)
-
-    open_so = df_db[df_db["status"] != "resolved"].copy()
-    open_so["dias_abierto"] = (today_ts - open_so["date_of_stockout"]).dt.days
-
-    resolved = df_db[df_db["status"] == "resolved"].copy()
-    resolved["dias_para_resolver"] = (resolved["date_resolved"] - resolved["date_of_stockout"]).dt.days
-    avg_days = resolved["dias_para_resolver"].mean() if not resolved.empty else None
-
-    print("\n=== STOCKOUTS ABIERTOS ===")
-    if open_so.empty:
-        print("  No hay stockouts abiertos.")
-    else:
-        for _, row in open_so.sort_values("dias_abierto", ascending=False).iterrows():
-            label = "QUEBRADO" if row["status"] == "broke" else "CRASH"
-            cob = f"{row['cobertura']*100:.1f}%" if pd.notna(row.get("cobertura")) else "N/A"
-            print(f"  [{label}] {row['product_name']} ({row['company']}) | Cobertura: {cob} | {row['dias_abierto']} dias sin resolver")
-
-    print("\n=== KPI: PROMEDIO DIAS PARA RESOLVER ===")
-    if avg_days is not None:
-        print(f"  Promedio historico: {avg_days:.1f} dias ({len(resolved)} casos resueltos)")
-    else:
-        print("  Sin datos historicos de resolucion aun.")
-
-    print(f"\n=== RESUMEN ===")
-    broke_count = len(open_so[open_so["status"] == "broke"])
-    crash_count = len(open_so[open_so["status"] == "crash"])
-    print(f"  Abiertos: {len(open_so)} (crash: {crash_count}, quebrados: {broke_count}) | Resueltos: {len(resolved)}")
-    if not open_so.empty:
-        print(f"  Mas critico: {open_so.sort_values('dias_abierto', ascending=False).iloc[0]['product_name']} ({int(open_so['dias_abierto'].max())} dias)")
-
 
 if (procedure == "1"):
     actualizar_stock()
