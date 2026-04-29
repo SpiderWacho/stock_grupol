@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Descartables</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181c27;
+    --surface2: #1e2336;
+    --border: #2a3050;
+    --accent: #4f7cff;
+    --accent-glow: rgba(79,124,255,0.15);
+    --danger: #ff4f6d;
+    --danger-glow: rgba(255,79,109,0.12);
+    --warning: #ffb340;
+    --warning-glow: rgba(255,179,64,0.12);
+    --success: #2ed87a;
+    --success-glow: rgba(46,216,122,0.1);
+    --text: #e8ecf4;
+    --text-muted: #6b7a99;
+    --text-dim: #3d4a6b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 32px; border-bottom: 1px solid var(--border);
+    background: var(--surface); position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo-mark {
+    width: 36px; height: 36px; background: var(--accent); border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #fff; box-shadow: 0 0 18px var(--accent-glow);
+  }
+  .app-title { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+  .app-subtitle { font-size: 12px; color: var(--text-muted); }
+  .last-updated {
+    font-size: 12px; color: var(--text-muted); font-family: 'DM Mono', monospace;
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 6px 14px; border-radius: 20px; display: flex; align-items: center; gap: 7px;
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--success);
+    box-shadow: 0 0 6px var(--success); animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .upload-panel {
+    margin: 22px 32px 0; border: 1px dashed var(--border); border-radius: 14px;
+    padding: 16px 22px; background: var(--surface);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .upload-icon {
+    width: 40px; height: 40px; flex-shrink: 0; background: var(--surface2);
+    border-radius: 10px; border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .upload-info { flex: 1; }
+  .upload-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .upload-sub { font-size: 12px; color: var(--text-muted); }
+  .upload-btn {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 16px; font-size: 13px; color: var(--text); cursor: pointer;
+    white-space: nowrap; transition: all 0.2s; display: flex; align-items: center; gap: 8px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .upload-btn:hover { border-color: var(--accent); color: var(--accent); }
+  #fileInput { display: none; }
+
+  .stats-bar { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin: 18px 32px 0; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 18px; position: relative; overflow: hidden;
+    cursor: pointer; transition: border-color 0.2s, background 0.2s;
+  }
+  .stat-card::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; }
+  .stat-card.card-critical::before { background: var(--danger); }
+  .stat-card.card-warning::before  { background: var(--warning); }
+  .stat-card.card-ok::before       { background: var(--success); }
+  .stat-card.card-zero::before     { background: var(--text-muted); opacity:.5; }
+  .stat-card.card-total::before    { background: var(--accent); opacity:.5; }
+  .stat-card.active                { border-color: var(--accent); background: var(--accent-glow); }
+  .stat-card.card-critical.active  { border-color: var(--danger); background: var(--danger-glow); }
+  .stat-card.card-warning.active   { border-color: var(--warning); background: var(--warning-glow); }
+  .stat-card.card-ok.active        { border-color: var(--success); background: var(--success-glow); }
+  .stat-card.card-warning::before  { background: var(--warning); }
+  .stat-card.card-warning.active   { border-color: var(--warning); background: var(--warning-glow); }
+  tbody tr.row-warning             { background: rgba(255,179,64,0.03); }
+  tbody tr.row-warning:hover       { background: rgba(255,179,64,0.08); }
+  .stat-card.card-danger::before   { background: #ff8c42; }
+  .stat-card.card-danger.active    { border-color: #ff8c42; background: rgba(255,140,66,0.1); }
+  .stat-value.danger-soft          { color: #ff8c42; }
+  .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing:.7px; font-weight:500; margin-bottom:6px; }
+  .stat-value { font-size: 26px; font-weight: 700; font-family: 'DM Mono', monospace; letter-spacing:-1px; }
+  .stat-value.danger  { color: var(--danger); }
+  .stat-value.warning { color: var(--warning); }
+  .stat-value.success { color: var(--success); }
+  .stat-value.muted   { color: var(--text-muted); }
+
+  .controls { display: flex; align-items: center; gap: 10px; margin: 14px 32px 0; }
+  .search-wrap { flex: 1; position: relative; }
+  .search-wrap input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 9px; padding: 9px 14px 9px 36px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color .2s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap input::placeholder { color: var(--text-dim); }
+  .search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--text-muted); font-size:13px; pointer-events:none; }
+
+  .table-wrap { margin: 14px 32px 32px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .table-header-row { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid var(--border); }
+  .table-title { font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.7px; }
+  .row-count { font-family:'DM Mono',monospace; font-size:12px; color:var(--text-dim); }
+  .table-container { overflow-x: auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  thead th {
+    background: var(--surface2); padding: 9px 14px; text-align:left;
+    font-size:11px; font-weight:600; color:var(--text-muted);
+    text-transform:uppercase; letter-spacing:.6px; border-bottom:1px solid var(--border);
+    white-space:nowrap; cursor:pointer; user-select:none; transition:color .15s;
+  }
+  thead th:hover { color: var(--text); }
+  thead th.sorted { color: var(--accent); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr.row-critical { background: rgba(255,79,109,0.04); }
+  tbody tr.row-critical:hover { background: rgba(255,79,109,0.09); }
+  tbody tr.row-danger { background: rgba(255,140,66,0.04); }
+  tbody tr.row-danger:hover { background: rgba(255,140,66,0.09); }
+  td { padding: 10px 14px; vertical-align: middle; }
+  .familia-cell { font-weight:500; white-space:nowrap; }
+  .um-badge {
+    display:inline-block; background:var(--surface2); border:1px solid var(--border);
+    border-radius:5px; padding:2px 6px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted);
+  }
+  .stock-num { font-family:'DM Mono',monospace; font-size:12px; text-align:right; white-space:nowrap; }
+  .col-need-start { border-left: 1px solid rgba(79,124,255,0.25) !important; background: rgba(79,124,255,0.03); }
+  .col-need-end   { border-right: 1px solid rgba(79,124,255,0.25) !important; background: rgba(79,124,255,0.03); }
+  .col-stock-start { border-left: 1px solid rgba(46,216,122,0.2) !important; background: rgba(46,216,122,0.02); }
+  .col-stock-end   { border-right: 1px solid rgba(46,216,122,0.2) !important; background: rgba(46,216,122,0.02); }
+  .col-stock-mid   { background: rgba(46,216,122,0.02); }
+  .stock-zero { color: var(--text-dim); }
+  .diff-cell { font-family:'DM Mono',monospace; font-size:12px; font-weight:600; text-align:right; white-space:nowrap; }
+  .diff-neg { color: var(--danger); }
+  .diff-pos { color: var(--success); }
+  .diff-zero { color: var(--text-muted); }
+
+  .cob-cell { min-width: 130px; }
+  .cob-wrap { display:flex; align-items:center; gap:8px; }
+  .cob-bar-bg { flex:1; height:5px; background:var(--surface2); border-radius:3px; overflow:hidden; border:1px solid var(--border); min-width:50px; }
+  .cob-bar-fill { height:100%; border-radius:3px; transition:width .3s; }
+  .cob-val { font-family:'DM Mono',monospace; font-size:11px; white-space:nowrap; min-width:40px; text-align:right; }
+
+  .badge { display:inline-flex; align-items:center; gap:5px; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600; white-space:nowrap; }
+  .badge-dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+  .badge-critical { background:var(--danger-glow); border:1px solid rgba(255,79,109,.3); color:var(--danger); }
+  .badge-critical .badge-dot { background:var(--danger); box-shadow:0 0 5px var(--danger); animation:pulse 1.5s infinite; }
+  .badge-warning  { background:var(--warning-glow); border:1px solid rgba(255,179,64,.3); color:var(--warning); }
+  .badge-warning  .badge-dot { background:var(--warning); }
+  .badge-danger   { background:rgba(255,140,66,0.1); border:1px solid rgba(255,140,66,0.3); color:#ff8c42; }
+  .badge-danger   .badge-dot { background:#ff8c42; }
+  .badge-ok       { background:var(--success-glow); border:1px solid rgba(46,216,122,.2); color:var(--success); }
+  .badge-ok       .badge-dot { background:var(--success); }
+  .badge-zero     { color:var(--text-muted); font-size:11px; font-weight:500; }
+
+  .empty-state { padding:60px 20px; text-align:center; color:var(--text-muted); }
+  .empty-state .icon { font-size:32px; margin-bottom:10px; }
+
+  /* Top scrollbar nav */
+  .top-scroll-nav { overflow-x: auto; overflow-y: hidden; height: 14px; margin: 14px 32px -14px; border-radius: 7px; cursor: pointer; }
+  .top-scroll-nav::-webkit-scrollbar { height: 6px; }
+  .top-scroll-nav::-webkit-scrollbar-track { background: var(--surface2); border-radius: 3px; }
+  .top-scroll-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .top-scroll-nav::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+  .top-scroll-inner { height: 1px; }
+
+  /* Draggable table */
+  .table-container { overflow-x: auto; cursor: grab; user-select: none; }
+  .table-container.dragging { cursor: grabbing; }
+
+  /* Estado cell */
+  .estado-cell { font-size:12px; color:var(--text-muted); white-space:nowrap; }
+  /* Ultima OC cell */
+  .oc-cell { font-family:'DM Mono',monospace; font-size:11px; color:var(--text-dim); white-space:nowrap; }
+
+  #noDataScreen {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:60vh; text-align:center; padding:40px;
+  }
+  .big-icon { font-size:52px; margin-bottom:18px; opacity:.4; }
+  .no-data-title { font-size:20px; font-weight:600; margin-bottom:8px; }
+  .no-data-sub { font-size:14px; color:var(--text-muted); max-width:400px; line-height:1.6; }
+  .instructions-card {
+    margin-top:24px; background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:18px 24px; text-align:left;
+    max-width:460px; font-size:13px; color:var(--text-muted); line-height:1.7;
+  }
+  .instructions-card strong { color:var(--text); }
+  code { background:var(--surface2); border:1px solid var(--border); padding:1px 6px; border-radius:4px; font-family:'DM Mono',monospace; font-size:12px; color:var(--accent); }
+  #mainContent { display:none; }
+
+  @media(max-width:900px){ .stats-bar{grid-template-columns:repeat(3,1fr);} }
+  @media(max-width:600px){
+    header{padding:12px 16px;}
+    .stats-bar,.controls,.table-wrap,.upload-panel{margin-left:16px;margin-right:16px;}
+    .stats-bar{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo-mark">S</div>
+    <div>
+      <div class="app-title">Stock Descartables</div>
+      <div class="app-subtitle">Panel de seguimiento</div>
+    </div>
+  </div>
+  <div class="last-updated" id="lastUpdated">
+    <span class="status-dot"></span>Sin datos cargados
+  </div>
+</header>
+
+<div class="upload-panel">
+  <div class="upload-icon">📂</div>
+  <div class="upload-info">
+    <div class="upload-title">Subir Excel</div>
+    <div class="upload-sub">Archivo "Seguimiento stock descartables VO" - Compulsa en <a href="https://grupolargentina.sharepoint.com/:x:/r/sites/Compass-Abastecimiento2/Shared%20Documents/Non%20Food/Legajos%20OC/Gaston%20Vecchio/2026/Febrero/Comparativa%20ACE%20Febrero.xlsx?d=wa739999e6e4942ba8773b8fbc15c6349&csf=1&web=1&e=2vSnQe">este link </a></div>
+  </div>
+  <label class="upload-btn" for="fileInput">📤 Seleccionar archivo</label>
+  <input type="file" id="fileInput" accept=".xlsx,.xls">
+</div>
+
+<div id="noDataScreen">
+  <div class="big-icon">📦</div>
+  <div class="no-data-title">Sin datos de stock</div>
+  <div class="no-data-sub">Subí el archivo Excel para ver el estado del stock, la cobertura por familia y las alertas críticas.</div>
+  <div class="instructions-card">
+    <strong>¿Cómo actualizar?</strong><br>
+    1. Guardá el Excel con los stocks nuevos<br>
+    2. Hacé clic en <strong>Seleccionar archivo</strong> arriba<br>
+    3. El panel se actualiza automáticamente<br><br>
+    <strong>Hoja requerida:</strong> <code>Necesidad x Familia</code>
+  </div>
+</div>
+
+<div id="mainContent">
+  <div class="stats-bar">
+    <div class="stat-card card-critical" onclick="setFilter('critical')" id="card-critical">
+      <div class="stat-label">⊘ Sin stock</div>
+      <div class="stat-value danger" id="statCritical">0</div>
+    </div>
+    <div class="stat-card card-danger" onclick="setFilter('danger')" id="card-danger">
+      <div class="stat-label">⚠ Crítico &lt;30%</div>
+      <div class="stat-value danger-soft" id="statDanger">0</div>
+    </div>
+    <div class="stat-card card-warning" onclick="setFilter('warning')" id="card-warning">
+      <div class="stat-label">↗ Stock bajo 30–50%</div>
+      <div class="stat-value warning" id="statWarning">0</div>
+    </div>
+    <div class="stat-card card-ok" onclick="setFilter('ok')" id="card-ok">
+      <div class="stat-label">✓ OK &gt;50%</div>
+      <div class="stat-value success" id="statOk">0</div>
+    </div>
+    <div class="stat-card card-total active" onclick="setFilter('all')" id="card-total">
+      <div class="stat-label">Total familias</div>
+      <div class="stat-value" id="statTotal">0</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="Buscar por familia...">
+    </div>
+  </div>
+
+  <div class="top-scroll-nav" id="topScrollNav">
+    <div class="top-scroll-inner" id="topScrollInner"></div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-header-row">
+      <span class="table-title">Inventario por Familia</span>
+      <span class="row-count" id="rowCount">—</span>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th rowspan="2" onclick="sortBy('familia')" style="vertical-align:bottom;border-right:1px solid var(--border)">Familia <span class="sa">↕</span></th>
+            <th rowspan="2" onclick="sortBy('um')" style="vertical-align:bottom;border-right:1px solid var(--border)">UM <span class="sa">↕</span></th>
+            <th colspan="2" style="text-align:center;background:rgba(79,124,255,0.08);color:var(--accent);border-left:1px solid rgba(79,124,255,0.3);border-right:1px solid rgba(79,124,255,0.3);letter-spacing:1px">NECESIDAD</th>
+            <th colspan="3" style="text-align:center;background:rgba(46,216,122,0.06);color:var(--success);border-left:1px solid rgba(46,216,122,0.2);border-right:1px solid rgba(46,216,122,0.2);letter-spacing:1px">STOCK POR DEPÓSITO</th>
+            <th rowspan="2" onclick="sortBy('diferencia')" style="text-align:right;vertical-align:bottom">Diferencia <span class="sa">↕</span></th>
+            <th rowspan="2" onclick="sortBy('cobertura')" class="cob-cell" style="vertical-align:bottom">Cobertura <span class="sa">↕</span></th>
+            <th rowspan="2" style="vertical-align:bottom">Estado</th>
+            <th rowspan="2" onclick="sortBy('ultimaOC')" style="vertical-align:bottom">Última OC <span class="sa">↕</span></th>
+          </tr>
+          <tr>
+            <th onclick="sortBy('moreno')" style="text-align:right;background:rgba(79,124,255,0.05);border-left:1px solid rgba(79,124,255,0.3)">Moreno <span class="sa">↕</span></th>
+            <th onclick="sortBy('ciudadela')" style="text-align:right;background:rgba(79,124,255,0.05);border-right:1px solid rgba(79,124,255,0.3)">Ciudadela <span class="sa">↕</span></th>
+            <th onclick="sortBy('moreno2')" style="text-align:right;background:rgba(46,216,122,0.04);border-left:1px solid rgba(46,216,122,0.2)">CD Moreno <span class="sa">↕</span></th>
+            <th onclick="sortBy('ciudadela3')" style="text-align:right;background:rgba(46,216,122,0.04)">CD Moreno 3 <span class="sa">↕</span></th>
+            <th onclick="sortBy('stockTotal')" style="text-align:right;background:rgba(46,216,122,0.04);border-right:1px solid rgba(46,216,122,0.2)">Total <span class="sa">↕</span></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+  let allData = [];
+  let currentFilter = 'all';
+  let currentSort = { col: null, dir: 1 };
+
+  document.getElementById('fileInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'array' });
+        const sheetName = wb.SheetNames.find(n =>
+          n.toLowerCase().includes('necesidad') && n.toLowerCase().includes('familia')
+        ) || wb.SheetNames.find(n => n.toLowerCase().includes('familia')) || wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+        parseData(raw, file.name);
+      } catch(err) {
+        alert('Error al leer el archivo: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  });
+
+  function parseData(rows, filename) {
+    const data = [];
+
+    // Find header row where col[0] === 'Familia'
+    let headerRowIdx = -1;
+    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+      if (rows[i] && rows[i][0] && String(rows[i][0]).trim().toLowerCase() === 'familia') {
+        headerRowIdx = i; break;
+      }
+    }
+    const dataStart = headerRowIdx >= 0 ? headerRowIdx + 1 : 2;
+
+    // Default column positions for current layout:
+    // [0]Familia [1]UM [2]EnNecesidad [3]Moreno [4]Ciudadela [5]Moreno2 [6]Ciudadela3
+    // [7]StockTotal [8]Diferencia [9]Cobertura [10]Estado [11]UltimaOC
+    let cFamilia=0, cUM=1, cMoreno=3, cCiudadela=4, cMoreno2=5, cCiudadela3=6;
+    let cStockTotal=7, cDif=8, cCobertura=9, cEstado=10, cOC=11;
+
+    if (headerRowIdx >= 0) {
+      const h = rows[headerRowIdx].map(v => v ? String(v).trim().toLowerCase() : '');
+      h.forEach((v, i) => {
+        if (v === 'familia')                                      cFamilia    = i;
+        else if (v.startsWith('um'))                              cUM         = i;
+        else if (v === 'moreno')                                  cMoreno     = i;
+        else if (v === 'ciudadela')                               cCiudadela  = i;
+        else if (v === 'moreno2')                                 cMoreno2    = i;
+        else if (v === 'ciudadela3')                              cCiudadela3 = i;
+        else if (v.includes('stock') && v.includes('total'))      cStockTotal = i;
+        else if (v === 'diferencia')                              cDif        = i;
+        else if (v === 'cobertura')                               cCobertura  = i;
+        else if (v === 'estado')                                  cEstado     = i;
+        else if (v.includes('ultima') || v === 'oc')              cOC         = i;
+      });
+    }
+
+    for (let i = dataStart; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r) continue;
+      const rawFam = r[cFamilia];
+      if (rawFam === null || rawFam === undefined || String(rawFam).trim() === '') continue;
+
+      const familia    = String(rawFam).trim();
+      const um         = parseFloat(r[cUM])         || 1;
+      const moreno     = parseFloat(r[cMoreno])     || 0;
+      const ciudadela  = parseFloat(r[cCiudadela])  || 0;
+      const moreno2    = parseFloat(r[cMoreno2])    || 0;
+      const ciudad3    = parseFloat(r[cCiudadela3]) || 0;
+      const stockTotal = (r[cStockTotal] !== null && r[cStockTotal] !== undefined && r[cStockTotal] !== '') ? parseFloat(r[cStockTotal]) : (moreno2 + ciudad3);
+      const rawDif     = r[cDif];
+      const dif        = (rawDif !== null && rawDif !== undefined && rawDif !== '') ? parseFloat(rawDif) : null;
+      const rawCob     = r[cCobertura];
+      const cobertura  = (rawCob !== null && rawCob !== undefined && rawCob !== '') ? parseFloat(rawCob) : null;
+      const estado     = r[cEstado] ? String(r[cEstado]).trim() : '';
+      const ultimaOC   = r[cOC]    ? String(r[cOC]).trim()     : '';
+
+      const necesidad = moreno + ciudadela;
+      const sinConsumo = necesidad === 0;
+
+      let category;
+      if (sinConsumo) {
+        category = 'zero';
+      } else if (cobertura === null || cobertura <= 0) {
+        category = 'critical';
+      } else if (cobertura < 0.3) {
+        category = 'danger';
+      } else if (cobertura < 0.5) {
+        category = 'warning';
+      } else {
+        category = 'ok';
+      }
+      data.push({ familia, um, moreno, ciudadela, moreno2, ciudadela3: ciudad3, stockTotal, diferencia: dif, necesidad, cobertura, estado, ultimaOC, category });
+    }
+
+    allData = data;
+
+    const now = new Date();
+    const ts = now.toLocaleDateString('es-AR') + ' ' + now.toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });
+    document.getElementById('lastUpdated').innerHTML = `<span class="status-dot"></span> Actualizado: ${ts}`;
+    document.getElementById('noDataScreen').style.display = 'none';
+    document.getElementById('mainContent').style.display  = 'block';
+    updateStats();
+    renderTable();
+  }
+
+  function updateStats() {
+    document.getElementById('statCritical').textContent = allData.filter(d => d.category === 'critical').length;
+    document.getElementById('statDanger').textContent   = allData.filter(d => d.category === 'danger').length;
+    document.getElementById('statWarning').textContent  = allData.filter(d => d.category === 'warning').length;
+    document.getElementById('statOk').textContent       = allData.filter(d => d.category === 'ok').length;
+    document.getElementById('statTotal').textContent    = allData.length;
+  }
+
+  function setFilter(f) {
+    currentFilter = f;
+    document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+    const map = { all:'card-total', critical:'card-critical', danger:'card-danger', warning:'card-warning', ok:'card-ok' };
+    const el = document.getElementById(map[f]);
+    if (el) el.classList.add('active');
+    renderTable();
+  }
+
+  function sortBy(col) {
+    currentSort.dir = currentSort.col === col ? currentSort.dir * -1 : 1;
+    currentSort.col = col;
+    document.querySelectorAll('thead th').forEach(th => {
+      th.classList.remove('sorted');
+      const sa = th.querySelector('.sa'); if (sa) sa.textContent = '↕';
+    });
+    const cols = ['familia','um','moreno','ciudadela','moreno2','ciudadela3','stockTotal','diferencia','cobertura','estado','ultimaOC'];
+    const idx = cols.indexOf(col);
+    const ths = document.querySelectorAll('thead th');
+    if (ths[idx]) {
+      ths[idx].classList.add('sorted');
+      const sa = ths[idx].querySelector('.sa');
+      if (sa) sa.textContent = currentSort.dir === 1 ? '↑' : '↓';
+    }
+    renderTable();
+  }
+
+  document.getElementById('searchInput').addEventListener('input', renderTable);
+
+  // ── Top scroll nav synced with table ──────────────────────────────────────
+  function setupScrollSync() {
+    const tableContainer = document.querySelector('.table-container');
+    const topNav = document.getElementById('topScrollNav');
+    const topInner = document.getElementById('topScrollInner');
+
+    function syncInnerWidth() {
+      topInner.style.width = tableContainer.scrollWidth + 'px';
+    }
+
+    // Keep inner width in sync with table
+    new ResizeObserver(syncInnerWidth).observe(tableContainer);
+    syncInnerWidth();
+
+    let syncing = false;
+    topNav.addEventListener('scroll', () => {
+      if (syncing) return;
+      syncing = true;
+      tableContainer.scrollLeft = topNav.scrollLeft;
+      syncing = false;
+    });
+    tableContainer.addEventListener('scroll', () => {
+      if (syncing) return;
+      syncing = true;
+      topNav.scrollLeft = tableContainer.scrollLeft;
+      syncing = false;
+    });
+  }
+  setupScrollSync();
+
+  // ── Draggable table ────────────────────────────────────────────────────────
+  (function() {
+    const el = document.querySelector('.table-container');
+    let isDown = false, startX, scrollLeft;
+    el.addEventListener('mousedown', e => {
+      if (e.target.closest('th')) return; // allow click on th for sorting
+      isDown = true;
+      el.classList.add('dragging');
+      startX = e.pageX - el.offsetLeft;
+      scrollLeft = el.scrollLeft;
+    });
+    document.addEventListener('mouseup', () => { isDown = false; el.classList.remove('dragging'); });
+    el.addEventListener('mousemove', e => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - el.offsetLeft;
+      el.scrollLeft = scrollLeft - (x - startX);
+    });
+  })();
+
+  function fmt(val) {
+    if (val === null || val === undefined || (typeof val === 'number' && isNaN(val))) return '—';
+    const r = Math.round(val * 100) / 100;
+    if (r === 0) return '0';
+    return r.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  function fmtCob(val) {
+    if (val === null || isNaN(val)) return '—';
+    if (val <= -1) return '0%';
+    if (val < 0)   return Math.round((1 + val) * 100) + '%';
+    if (val < 10)  return (Math.round(val * 100)) + '%';
+    return Math.round(val) + '%';
+  }
+
+  function cobColor(val) {
+    if (val === null || isNaN(val)) return 'var(--text-dim)';
+    if (val <= 0)           return 'var(--danger)';   // sin stock
+    if (val < 0.3)          return '#ff4f6d';          // critico < 30%
+    if (val < 0.5)          return '#ff8c42';          // stock bajo 30-50%
+    return 'var(--success)';                           // ok >= 50%
+  }
+
+  function cobWidth(val) {
+    if (val === null || isNaN(val)) return 0;
+    if (val <= 0) return 3;
+    return Math.min(100, val * 100);
+  }
+
+  function renderTable() {
+    const search = document.getElementById('searchInput').value.toLowerCase().trim();
+    let data = allData.filter(d => !search || d.familia.toLowerCase().includes(search));
+    if (currentFilter !== 'all') data = data.filter(d => d.category === currentFilter);
+
+    if (currentSort.col) {
+      const { col, dir } = currentSort;
+      data.sort((a, b) => {
+        let va = a[col], vb = b[col];
+        if (va === null || va === undefined) va = dir > 0 ? Infinity : -Infinity;
+        if (vb === null || vb === undefined) vb = dir > 0 ? Infinity : -Infinity;
+        return typeof va === 'string' ? dir * va.localeCompare(vb) : dir * (va - vb);
+      });
+    } else {
+      const order = { critical:0, danger:1, warning:2, ok:3, zero:4 };
+      data.sort((a, b) => {
+        if (order[a.category] !== order[b.category]) return order[a.category] - order[b.category];
+        // Within same category sort by cobertura ascending (lowest coverage first)
+        const ca = a.cobertura ?? 0;
+        const cb = b.cobertura ?? 0;
+        if (ca !== cb) return ca - cb;
+        return a.familia.localeCompare(b.familia);
+      });
+    }
+
+    document.getElementById('rowCount').textContent = `${data.length} familia${data.length !== 1 ? 's' : ''}`;
+    const tbody = document.getElementById('tableBody');
+
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="12"><div class="empty-state"><div class="icon">🔍</div><p>Sin resultados.</p></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.map(d => {
+      const rowClass = d.category === 'critical' ? 'row-critical' : d.category === 'danger' ? 'row-danger' : d.category === 'warning' ? 'row-warning' : '';
+      let badge;
+      if      (d.category === 'critical') badge = `<span class="badge badge-critical"><span class="badge-dot"></span>SIN STOCK</span>`;
+      else if (d.category === 'danger')   badge = `<span class="badge badge-danger"><span class="badge-dot"></span>CRÍTICO &lt;30%</span>`;
+      else if (d.category === 'warning')  badge = `<span class="badge badge-warning"><span class="badge-dot"></span>STOCK BAJO</span>`;
+      else if (d.category === 'ok')       badge = `<span class="badge badge-ok"><span class="badge-dot"></span>OK</span>`;
+      else                                badge = `<span class="badge-zero">Sin consumo</span>`;
+
+      const difClass = d.diferencia === null ? 'diff-zero' : d.diferencia < 0 ? 'diff-neg' : 'diff-pos';
+      const difText  = d.diferencia === null ? '—' : (d.diferencia > 0 ? '+' : '') + fmt(d.diferencia);
+      const color = cobColor(d.cobertura);
+      const numCell = (v, extra='') => { const f = fmt(v); return `<td class="stock-num ${f==='0'?'stock-zero':''} ${extra}">${f}</td>`; };
+
+      return `<tr class="${rowClass}">
+        <td class="familia-cell" style="border-right:1px solid var(--border)">${d.familia}</td>
+        <td style="border-right:1px solid var(--border)"><span class="um-badge">×${fmt(d.um)}</span></td>
+        ${numCell(d.moreno,   'col-need-start')}
+        ${numCell(d.ciudadela,'col-need-end')}
+        ${numCell(d.moreno2,  'col-stock-start')}
+        ${numCell(d.ciudadela3,'col-stock-mid')}
+        ${numCell(d.stockTotal,'col-stock-end')}
+        <td class="diff-cell ${difClass}">${difText}</td>
+        <td class="cob-cell">
+          <div class="cob-wrap">
+            <div class="cob-bar-bg"><div class="cob-bar-fill" style="width:${cobWidth(d.cobertura)}%;background:${color}"></div></div>
+            <span class="cob-val" style="color:${color}">${fmtCob(d.cobertura)}</span>
+          </div>
+        </td>
+        <td>${badge}</td>
+        <td class="estado-cell">${d.estado || '—'}</td>
+        <td class="oc-cell">${d.ultimaOC || '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+</script>
+</body>
+</html>

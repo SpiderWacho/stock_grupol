@@ -8,7 +8,7 @@ import os
 from openpyxl import load_workbook
 from datetime import date
 
-TARGET_EXCEL = r"C:\Users\GastonVecchio\Documents\Stock\Stock depositos.xlsx"
+TARGET_EXCEL = r"C:\Users\GastonVecchio\Documents\Code\Python\Stocks\Stock depositos.xlsx"
 EMAIL_RECEIVER = "gaston.vecchio@grupolargentina.com"
 PRODUCT_COL   = "Familia"               # Column name for product names
 STOCK_COL     = "Cobertura" 
@@ -29,7 +29,7 @@ def _migrate_db():
         cursor.execute("ALTER TABLE stockouts ADD COLUMN date_resolved TEXT")
     conn.commit()
 
-_migrate_db()
+#_migrate_db()
 
 procedure = input("Que queres hacer?\n1-Actualizar stocks\n2-Alertar faltantes\n3-Ver KPIs de stockouts\n")
 
@@ -38,7 +38,7 @@ def actualizar_stock():
     load_dotenv()
     
     METABASE_URL = "https://metabase-new.grupol.ar"
-    USERNAME = os.getenv("USERNAME")
+    USERNAME = os.getenv("METABASE_USER")
     PASSWORD = os.getenv("PASSWORD")
     print("Porfavor espera mientras se actualizan los stocks...")
     
@@ -56,6 +56,12 @@ def actualizar_stock():
             f"{METABASE_URL}/api/card/201/query/xlsx",
             headers={"X-Metabase-Session": token}
         )
+
+        print(response.status_code)
+        print(response.content[:300])
+
+        with open("temp_report.xlsx", "rb") as f:
+            print(f.read(100))
 
         # Save to a temp file and read it
         with open("temp_report.xlsx", "wb") as f:
@@ -224,24 +230,7 @@ def alertar_faltantes():
 
     # Send email ATLATNICO
     send_email(html_body, "⚠️ Alerta productos con stock menor a 50% ATLANTICO")
-
-    def write_to_db():
-        cursor.execute("SELECT product_name, date_of_stockout FROM stockouts WHERE product_name=?",(product,))
-        rows = cursor.fetchall()
-
-
-        for product_name, date_of_stockout in rows:
-            stockout_date = date.fromisoformat(date_of_stockout)
-            days_ago = (today - stockout_date).days
-            print(f"{product_name} ran out of stock {days_ago} days ago")
-            if (days_ago < 1):
-                cursor.execute("""
-                    INSERT INTO stockouts (product_name, date_of_stockout, note)
-                    VALUES (?, ?, ?)
-                    """, (product, today, estado)          )
-        
-        conn.commit()
-
+    
 
 if (procedure == "1"):
     actualizar_stock()
