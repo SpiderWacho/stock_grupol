@@ -9,9 +9,11 @@ from openpyxl import load_workbook
 from datetime import date
 
 TARGET_EXCEL = r"C:\Users\GastonVecchio\Documents\Code\Python\Stocks\Stock depositos.xlsx"
-EMAIL_RECEIVER = "gaston.vecchio@grupolargentina.com"
 PRODUCT_COL   = "Familia"               # Column name for product names
 STOCK_COL     = "Cobertura" 
+
+load_dotenv()
+EMAIL_RECEIVER = os.getenv("EMAIL")
 
 today = date.today()
 
@@ -37,7 +39,7 @@ procedure = input("Que queres hacer?\n1-Actualizar stocks\n2-Alertar faltantes\n
 def actualizar_stock():
     load_dotenv()
     
-    METABASE_URL = "https://metabase-new.grupol.ar"
+    METABASE_URL = os.getenv("URL")
     USERNAME = os.getenv("METABASE_USER")
     PASSWORD = os.getenv("PASSWORD")
     print("Porfavor espera mientras se actualizan los stocks...")
