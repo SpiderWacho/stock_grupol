@@ -224,7 +224,24 @@ def alertar_faltantes():
 
     # Send email ATLATNICO
     send_email(html_body, "⚠️ Alerta productos con stock menor a 50% ATLANTICO")
-    
+
+    def write_to_db():
+        cursor.execute("SELECT product_name, date_of_stockout FROM stockouts WHERE product_name=?",(product,))
+        rows = cursor.fetchall()
+
+
+        for product_name, date_of_stockout in rows:
+            stockout_date = date.fromisoformat(date_of_stockout)
+            days_ago = (today - stockout_date).days
+            print(f"{product_name} ran out of stock {days_ago} days ago")
+            if (days_ago < 1):
+                cursor.execute("""
+                    INSERT INTO stockouts (product_name, date_of_stockout, note)
+                    VALUES (?, ?, ?)
+                    """, (product, today, estado)          )
+        
+        conn.commit()
+
 
 if (procedure == "1"):
     actualizar_stock()
