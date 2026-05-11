@@ -22,6 +22,18 @@ cursor = conn.cursor()
 
 
 def _migrate_db():
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS stockouts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_name TEXT,
+            date_of_stockout TEXT,
+            notes TEXT,
+            company TEXT,
+            cobertura REAL,
+            status TEXT DEFAULT 'crash',
+            date_resolved TEXT
+        )
+    """)
     existing = [row[1] for row in cursor.execute("PRAGMA table_info(stockouts)").fetchall()]
     if "cobertura" not in existing:
         cursor.execute("ALTER TABLE stockouts ADD COLUMN cobertura REAL")
@@ -31,7 +43,7 @@ def _migrate_db():
         cursor.execute("ALTER TABLE stockouts ADD COLUMN date_resolved TEXT")
     conn.commit()
 
-#_migrate_db()
+_migrate_db()
 
 procedure = input("Que queres hacer?\n1-Actualizar stocks\n2-Alertar faltantes\n3-Ver KPIs de stockouts\n")
 
@@ -60,11 +72,15 @@ def actualizar_stock():
         )
         print("Connectado exitosamente.")
 
-    except:
-        print("Error on Metabase connection")
+        with open("temp_report.xlsx", "wb") as f:
+            f.write(response.content)
 
-    # Load data from the downloaded file
-    df = pd.read_excel("temp_report.xlsx")
+        # Load data from the downloaded file
+        df = pd.read_excel("temp_report.xlsx")
+
+    except Exception as e:
+        print(f"Error on Metabase connection: {e}")
+        return
 
     stock_ciu = df[df["CtroDistrib"].str.contains("CIUDADELA")]
     stock_moreno = df[(df["Empresa"].str.contains("GRUPO L")) & ((df["CtroDistrib"].str.contains("CDM03 - MORENO 3")) | (df["CtroDistrib"].str.contains("CDM02 - MORENO 2")) | (df["CtroDistrib"].str.contains("CD MORENO")))]
@@ -75,20 +91,20 @@ def actualizar_stock():
         stock_moreno.to_excel(writer, sheet_name="STOCK MORENO", index=False)
         stock_atlantico.to_excel(writer, sheet_name="STOCK ATLANTICO", index=False)
 
-    ATLANTICO_PATH = r"C:\Users\GastonVecchio\Grupo L\Abastecimiento Online - Documentos (1)\10. Operador Descartables\COMPRAS DESCARTABLES MORENO Y CIUDADELA\Seguimiento stock descartables ATLANTICO.xlsx"
-    VO_PATH = r"C:\Users\GastonVecchio\Grupo L\Abastecimiento Online - Documentos (1)\10. Operador Descartables\COMPRAS DESCARTABLES MORENO Y CIUDADELA\Seguimiento stock descartables VO.xlsx"
+    ATLANTICO_PATH = r"Files/Seguimiento stock descartables ATLANTICO.xlsx"
+    VO_PATH = r"Files/Seguimiento stock descartables VO.xlsx"
 
-    #write_to_excel(ATLANTICO_PATH, "Stock", stock_atlantico, 0)
-    #write_to_excel(VO_PATH, "Stock", stock_moreno, 0)
-    #write_to_excel(VO_PATH, "Stock", stock_ciu, start_row=len(stock_moreno) + 2)
+    write_to_excel(ATLANTICO_PATH, "Stock", stock_atlantico, start_row=2, clear=True)
+    write_to_excel(VO_PATH, "Stock", stock_moreno, start_row=2, clear=True)
+    write_to_excel(VO_PATH, "Stock", stock_ciu, start_row=len(stock_moreno) + 2)
 
-def write_to_excel(target_path, sheet_name, df, start_row=1):
-    
+def write_to_excel(target_path, sheet_name, df, start_row=2, clear=False):
+
     wb = load_workbook(target_path)
     ws = wb[sheet_name]
 
-    if start_row == 1:  # only clear on first write
-        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=15):
+    if clear:
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=15):
             for cell in row:
                 cell.value = None
 
@@ -167,6 +183,12 @@ def alertar_faltantes():
                 <td style="padding: 8px; border: 1px solid #ddd; text-align:center;">{estado}</td>
             </tr>
         """
+        return rows
+
+    VO_STOCK = pd.read_excel(r"Files/Seguimiento stock descartables VO.xlsx", sheet_name="Necesidad por familia")
+    VO_STOCK["Cobertura"] = pd.to_numeric(VO_STOCK["Cobertura"], errors="coerce")
+    low_stock_VO_df = VO_STOCK[VO_STOCK["Cobertura"] < 0.50].dropna(subset=["Cobertura"])
+    rows_html = build_rows_html(low_stock_VO_df)
 
     html_body = f"""
     <p>Este es un mail automatico, comprar los siguientes productos con poco stock:</p>
@@ -185,9 +207,10 @@ def alertar_faltantes():
     """
 
     send_email(html_body, "⚠️ Alerta productos con stock menor a 50% VO")
+    _sync_stockouts(VO_STOCK, "VO")
 
     # Build email ATLANTICO
-    ATLANTICO_STOCK = pd.read_excel(r"C:\Users\GastonVecchio\Grupo L\Abastecimiento Online - Documentos (1)\10. Operador Descartables\COMPRAS DESCARTABLES MORENO Y CIUDADELA\Seguimiento stock descartables ATLANTICO.xlsx", "Necesidad por familia")
+    ATLANTICO_STOCK = pd.read_excel(r"Files/Seguimiento stock descartables ATLANTICO.xlsx", "Necesidad por familia")
     ATLANTICO_STOCK["Cobertura"] = pd.to_numeric(ATLANTICO_STOCK["Cobertura"], errors="coerce")
     low_stock_ATLANTICO_df = ATLANTICO_STOCK[ATLANTICO_STOCK["Cobertura"] < 0.50]      
     low_stock_ATLANTICO_df = low_stock_ATLANTICO_df.dropna(subset=["Cobertura"])                                     
@@ -223,7 +246,8 @@ def alertar_faltantes():
 
     # Send email ATLATNICO
     send_email(html_body, "⚠️ Alerta productos con stock menor a 50% ATLANTICO")
-    
+    _sync_stockouts(ATLANTICO_STOCK, "ATLANTICO")
+
 
 if (procedure == "1"):
     actualizar_stock()
