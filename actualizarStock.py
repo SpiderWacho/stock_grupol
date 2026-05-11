@@ -58,17 +58,8 @@ def actualizar_stock():
             f"{METABASE_URL}/api/card/201/query/xlsx",
             headers={"X-Metabase-Session": token}
         )
+        print("Connectado exitosamente.")
 
-        print(response.status_code)
-        print(response.content[:300])
-
-        with open("temp_report.xlsx", "rb") as f:
-            print(f.read(100))
-
-        # Save to a temp file and read it
-        with open("temp_report.xlsx", "wb") as f:
-            f.write(response.content)
-        
     except:
         print("Error on Metabase connection")
 
